@@ -72,7 +72,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         vsftpd libpam-modules db-util inotify-tools \
     && rm -rf /var/lib/apt/lists/*
 COPY entrypoint.sh /entrypoint.sh
-RUN useradd -r -s /usr/sbin/nologin ftpvirt
+RUN useradd -r -s /usr/sbin/nologin -d /srv/ftp ftpvirt
 EXPOSE 21 30000-30099
 ENTRYPOINT ["/entrypoint.sh"]
 ```
@@ -87,6 +87,7 @@ local_enable=YES
 write_enable=YES
 guest_enable=YES
 guest_username=ftpvirt
+virtual_use_local_privs=YES
 user_sub_token=$USER
 local_root=/srv/ftp/$USER
 chroot_local_user=YES
