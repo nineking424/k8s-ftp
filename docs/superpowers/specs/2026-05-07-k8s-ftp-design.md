@@ -61,14 +61,18 @@ k8s 클러스터 내부에 Plain FTP 서비스를 구축한다. 사내 사용자
 
 ### 4.1 vsftpd 컨테이너 이미지
 
-Alpine 기반 자체 빌드. 진입점 스크립트가 ConfigMap/Secret을 읽고 vsftpd를 기동한다. 분기별 보안 패치 재빌드 주기를 가진다.
+Debian 12-slim 기반 자체 빌드. 진입점 스크립트가 ConfigMap/Secret을 읽고 vsftpd를 기동한다. 분기별 보안 패치 재빌드 주기를 가진다.
+
+**베이스 이미지 결정 (2026-05-11 갱신)**: 본 설계의 핵심인 vsftpd 가상 사용자 인증은 `pam_userdb.so` 모듈에 의존한다. Alpine Linux 3.20의 `linux-pam` 패키지는 이 모듈을 빌드 시 포함하지 않아 사용 불가하다. Debian 12-slim의 `libpam-modules` 패키지는 `pam_userdb.so`를 정상 제공하며 `db-util`로 `db_load`도 함께 사용 가능하다. 트레이드오프: 이미지 크기 증가(~22MB → ~80MB), 패치 빈도 차이는 분기별 재빌드로 흡수한다.
 
 Dockerfile 골자:
 ```Dockerfile
-FROM alpine:3.20
-RUN apk add --no-cache vsftpd db-utils inotify-tools
+FROM debian:12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        vsftpd libpam-modules db-util inotify-tools \
+    && rm -rf /var/lib/apt/lists/*
 COPY entrypoint.sh /entrypoint.sh
-RUN adduser -D -H -s /sbin/nologin ftpvirt
+RUN useradd -r -s /usr/sbin/nologin ftpvirt
 EXPOSE 21 30000-30099
 ENTRYPOINT ["/entrypoint.sh"]
 ```
