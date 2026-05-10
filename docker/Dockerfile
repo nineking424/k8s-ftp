@@ -8,7 +8,7 @@ RUN apt-get update \
         inotify-tools \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -s /usr/sbin/nologin ftpvirt \
-    && mkdir -p /etc/vsftpd /shared /srv/ftp /var/run/users \
+    && mkdir -p /etc/vsftpd /shared /srv/ftp /var/run/users /var/run/vsftpd/empty \
     && chown ftpvirt:ftpvirt /srv/ftp
 
 COPY conf/vsftpd.conf.template /etc/vsftpd/vsftpd.conf.template

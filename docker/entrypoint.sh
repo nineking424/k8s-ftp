@@ -30,5 +30,15 @@ else
     echo "WARN: $USERS_TXT not found, vsftpd will start but no users can log in" >&2
 fi
 
+# vsftpd 로그를 stdout으로 노출: named pipe + tail -F
+# (vsftpd는 privsep 후 비특권 child에서 log_file을 open하므로 /dev/stdout 직접 사용 불가)
+LOG_PIPE=/var/log/vsftpd.log
+if [ ! -p "$LOG_PIPE" ]; then
+    rm -f "$LOG_PIPE"
+    mkfifo "$LOG_PIPE"
+    chmod 666 "$LOG_PIPE"
+fi
+tail -F "$LOG_PIPE" &
+
 # vsftpd 기동 (foreground)
 exec /usr/sbin/vsftpd /etc/vsftpd/vsftpd.conf
