@@ -7,7 +7,7 @@ RUN apt-get update \
         db-util \
         inotify-tools \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd -r -s /usr/sbin/nologin ftpvirt \
+    && useradd -r -s /usr/sbin/nologin -d /srv/ftp ftpvirt \
     && mkdir -p /etc/vsftpd /shared /srv/ftp /var/run/users /var/run/vsftpd/empty \
     && chown ftpvirt:ftpvirt /srv/ftp
 

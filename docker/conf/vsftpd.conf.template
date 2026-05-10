@@ -5,6 +5,7 @@ local_enable=YES
 write_enable=YES
 guest_enable=YES
 guest_username=ftpvirt
+virtual_use_local_privs=YES
 user_sub_token=$USER
 local_root=/srv/ftp/$USER
 chroot_local_user=YES
