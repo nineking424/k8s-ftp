@@ -112,8 +112,10 @@ pam_service_name=vsftpd_virtual
 xferlog_enable=YES
 xferlog_std_format=NO
 log_ftp_protocol=YES
-vsftpd_log_file=/dev/stdout
+vsftpd_log_file=/var/log/vsftpd.log
 ```
+
+**로그 stdout 노출 결정 노트:** vsftpd는 privsep 모델로 fork 후 비특권 child에서 `vsftpd_log_file`을 open한다. `/dev/stdout`(=`/proc/self/fd/1`)은 chroot/setuid 직후 접근 권한을 잃어 `500 OOPS: failed to open vsftpd log file:/dev/stdout`로 모든 세션이 banner 단계에서 끊긴다. 따라서 conf는 일반 파일 경로(`/var/log/vsftpd.log`)를 지정하고, entrypoint에서 해당 경로를 named pipe(FIFO)로 만든 뒤 `tail -F`를 백그라운드로 띄워 PID 1의 stdout으로 흘려보낸다. kubectl logs로 FTP 프로토콜 라인 전부를 그대로 확인할 수 있다.
 
 ### 4.3 PAM 가상 사용자 인증
 
