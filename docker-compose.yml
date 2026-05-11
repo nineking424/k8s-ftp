@@ -1,0 +1,19 @@
+services:
+  vsftpd:
+    build: ./docker
+    image: k8s-ftp:dev
+    container_name: k8s-ftp-dev
+    ports:
+      - "2121:21"
+      - "30000-30099:30000-30099"
+    environment:
+      PASV_ADDRESS: "127.0.0.1"
+    volumes:
+      - ./dev/users.txt:/var/run/users/users.txt:ro
+      - ftp-data:/srv/ftp
+    cap_add:
+      - NET_BIND_SERVICE
+      - SYS_CHROOT
+
+volumes:
+  ftp-data:

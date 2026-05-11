@@ -3,6 +3,9 @@
 *.swp
 *.swo
 
+# 도구 메타데이터
+.serena/
+
 # 평문 사용자 자격증명은 절대 커밋 금지
 secrets/
 *.users.txt
