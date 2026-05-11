@@ -6,15 +6,7 @@ USERS_TXT="${USERS_TXT:-/var/run/users/users.txt}"
 SHARED_DIR="${SHARED_DIR:-/shared}"
 FTP_ROOT="${FTP_ROOT:-/srv/ftp}"
 
-mkdir -p "$SHARED_DIR" "$FTP_ROOT"
-
-# vsftpd.conf 렌더링
-sed "s|__PASV_ADDRESS__|${PASV_ADDRESS}|g" \
-    /etc/vsftpd/vsftpd.conf.template \
-    > /etc/vsftpd/vsftpd.conf
-
-# PAM 설정 배치
-cp /etc/vsftpd/pam_vsftpd_virtual /etc/pam.d/vsftpd_virtual
+mkdir -p "$SHARED_DIR" "$FTP_ROOT" /var/run/vsftpd/empty
 
 # 초기 users.db 생성
 if [ -f "$USERS_TXT" ]; then
@@ -32,7 +24,7 @@ fi
 
 # vsftpd 로그를 stdout으로 노출: named pipe + tail -F
 # (vsftpd는 privsep 후 비특권 child에서 log_file을 open하므로 /dev/stdout 직접 사용 불가)
-LOG_PIPE=/var/log/vsftpd.log
+LOG_PIPE=/var/run/vsftpd/vsftpd.log
 if [ ! -p "$LOG_PIPE" ]; then
     rm -f "$LOG_PIPE"
     mkfifo "$LOG_PIPE"
@@ -40,5 +32,5 @@ if [ ! -p "$LOG_PIPE" ]; then
 fi
 tail -F "$LOG_PIPE" &
 
-# vsftpd 기동 (foreground)
-exec /usr/sbin/vsftpd /etc/vsftpd/vsftpd.conf
+# vsftpd 기동 (foreground). pasv_address는 argv로 주입해 RO root에서도 동작
+exec /usr/sbin/vsftpd /etc/vsftpd/vsftpd.conf "-opasv_address=${PASV_ADDRESS}"

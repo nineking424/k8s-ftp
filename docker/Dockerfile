@@ -6,16 +6,17 @@ RUN apt-get update \
         libpam-modules \
         db-util \
         inotify-tools \
+        tini \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -s /usr/sbin/nologin -d /srv/ftp ftpvirt \
     && mkdir -p /etc/vsftpd /shared /srv/ftp /var/run/users /var/run/vsftpd/empty \
     && chown ftpvirt:ftpvirt /srv/ftp
 
-COPY conf/vsftpd.conf.template /etc/vsftpd/vsftpd.conf.template
-COPY conf/pam_vsftpd_virtual /etc/vsftpd/pam_vsftpd_virtual
+COPY conf/vsftpd.conf /etc/vsftpd/vsftpd.conf
+COPY conf/pam_vsftpd_virtual /etc/pam.d/vsftpd_virtual
 COPY entrypoint.sh /entrypoint.sh
 COPY user-syncer.sh /user-syncer.sh
 
 EXPOSE 21 30000-30099
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
