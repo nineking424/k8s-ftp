@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ftp-data
+  namespace: ftp
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-client        # 사내 NAS StorageClass 이름으로 치환
+  resources:
+    requests:
+      storage: 100Gi                  # 초기 용량, 운영 합의값으로 조정
