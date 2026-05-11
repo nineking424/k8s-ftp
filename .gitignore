@@ -7,3 +7,5 @@
 secrets/
 *.users.txt
 users.db
+k8s/03-secret.yaml
+dev/users.txt
