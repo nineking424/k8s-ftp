@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: vsftpd
-          image: ghcr.io/nineking424/k8s-ftp:v0.1.0
+          image: ghcr.io/nineking424/k8s-ftp:v0.1.1
           imagePullPolicy: IfNotPresent
           env:
             - name: PASV_ADDRESS
@@ -47,7 +47,9 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
-              add: [NET_BIND_SERVICE, SYS_CHROOT]
+              # vsftpd가 ftpvirt로 권한을 떨굴 때 setgroups/setuid 필요,
+              # entrypoint가 사용자별 디렉토리 chown 수행
+              add: [NET_BIND_SERVICE, SYS_CHROOT, SETUID, SETGID, CHOWN]
           livenessProbe:
             tcpSocket:
               port: 21
