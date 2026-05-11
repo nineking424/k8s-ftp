@@ -68,6 +68,32 @@ spec:
             limits:
               cpu: "2"
               memory: "4Gi"
+        - name: user-syncer
+          image: ghcr.io/nineking424/k8s-ftp:v0.1.1
+          imagePullPolicy: IfNotPresent
+          command: ["/user-syncer.sh"]
+          volumeMounts:
+            - name: ftp-data
+              mountPath: /srv/ftp
+            - name: users-secret
+              mountPath: /var/run/users
+              readOnly: true
+            - name: shared
+              mountPath: /shared
+            - name: run-syncer
+              mountPath: /var/run
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
       volumes:
         - name: ftp-data
           persistentVolumeClaim:
@@ -81,4 +107,6 @@ spec:
         - name: shared
           emptyDir: {}
         - name: run
+          emptyDir: {}
+        - name: run-syncer
           emptyDir: {}
