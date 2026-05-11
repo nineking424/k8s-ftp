@@ -4,4 +4,4 @@ metadata:
   name: vsftpd-config
   namespace: ftp
 data:
-  PASV_ADDRESS: "10.0.0.42"          # 실제 사내 LB IP로 치환
+  PASV_ADDRESS: "192.168.3.42"       # 실제 사내 LB IP
