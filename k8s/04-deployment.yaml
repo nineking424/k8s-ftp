@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vsftpd
+  namespace: ftp
+  labels:
+    app: vsftpd
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate                    # 단일 Pod, 충돌 방지
+  selector:
+    matchLabels:
+      app: vsftpd
+  template:
+    metadata:
+      labels:
+        app: vsftpd
+    spec:
+      containers:
+        - name: vsftpd
+          image: ghcr.io/nineking424/k8s-ftp:v0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PASV_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: vsftpd-config
+                  key: PASV_ADDRESS
+          ports:
+            - name: ftp-ctrl
+              containerPort: 21
+              protocol: TCP
+            # PASV 포트는 named로 일일이 나열 불가. Service 측에서 처리.
+          volumeMounts:
+            - name: ftp-data
+              mountPath: /srv/ftp
+            - name: users-secret
+              mountPath: /var/run/users
+              readOnly: true
+            - name: shared
+              mountPath: /shared
+            - name: run
+              mountPath: /var/run
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+              add: [NET_BIND_SERVICE, SYS_CHROOT]
+          livenessProbe:
+            tcpSocket:
+              port: 21
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 21
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+      volumes:
+        - name: ftp-data
+          persistentVolumeClaim:
+            claimName: ftp-data
+        - name: users-secret
+          secret:
+            secretName: vsftpd-users
+            items:
+              - key: users.txt
+                path: users.txt
+        - name: shared
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
