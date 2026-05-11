@@ -1,5 +1,6 @@
 site_name: k8s-ftp
 site_description: 사내망 전용 Plain FTP 서비스 (vsftpd 단일 Pod + NAS PVC + 가상 사용자)
+site_url: https://nineking424.github.io/k8s-ftp/
 repo_name: nineking424/k8s-ftp
 repo_url: https://github.com/nineking424/k8s-ftp
 
@@ -14,6 +15,9 @@ markdown_extensions:
   - tables
   - toc:
       permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid

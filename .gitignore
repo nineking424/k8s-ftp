@@ -12,3 +12,6 @@ secrets/
 users.db
 k8s/03-secret.yaml
 dev/users.txt
+
+# mkdocs build 산출물
+site/

@@ -30,7 +30,7 @@ vsftpd 가 stdout 으로 흘리는 라인은 모두 `xferlog_std_format=NO` 의 
 
 **상태 추적은 로그가 아니라 Secret 과 NAS PVC.** xferlog 는 후행 관찰용이고, 사용자 목록 source of truth 는 `kubectl get secret vsftpd-users -o jsonpath='{.data.users\.txt}' | base64 -d`.
 
-## 동시 세션 / PASV 사용률
+## 동시 세션과 PASV 사용률
 
 `ss` 는 컨테이너 PID/namespace 제약으로 0 만 반환한다 (Task 27 부하 테스트에서 확인). 대체 신호는 vsftpd 자식 PID 카운트다 — vsftpd 는 세션당 한 프로세스를 띄운다.
 
