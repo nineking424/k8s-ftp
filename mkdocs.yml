@@ -1,0 +1,40 @@
+site_name: k8s-ftp
+site_description: 사내망 전용 Plain FTP 서비스 (vsftpd 단일 Pod + NAS PVC + 가상 사용자)
+repo_name: nineking424/k8s-ftp
+repo_url: https://github.com/nineking424/k8s-ftp
+
+docs_dir: docs
+
+theme:
+  name: readthedocs
+  navigation_depth: 3
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search
+  - mermaid2
+
+strict: true
+
+exclude_docs: |
+  superpowers/
+
+nav:
+  - 개요: index.md
+  - 개념:
+      - 개요: concepts/index.md
+      - 아키텍처: concepts/architecture.md
+  - 운영:
+      - 개요: operating/index.md
+      - 모니터링: operating/monitoring.md
+      - 트러블슈팅: operating/troubleshooting.md
