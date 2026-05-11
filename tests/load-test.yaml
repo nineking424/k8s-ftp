@@ -1,0 +1,95 @@
+# 500 동시 FTP control 세션 부하 테스트
+#
+# 설계 결정:
+# - vsftpd 의 max_per_ip=10 (DoS 보호) 때문에 단일 Pod 에서 500 세션을 만들 수 없다.
+#   각 클라이언트 IP 당 최대 10 세션이므로 50 개의 loadgen Pod (각 Pod=10 세션)
+#   을 Job parallelism 으로 띄워 총 500 세션을 만든다.
+# - lftp -e 다중라인 스크립트가 환경에 따라 동작하지 않는 이슈가 있어 stdin
+#   heredoc 방식으로 cls 반복 스크립트를 주입한다 (5 초 간격 LIST).
+# - 100 PASV 포트 풀(30000-30099)로 500 control + LIST 전용 워크로드(동시 data <100)
+#   를 처리할 수 있는지 검증한다.
+#
+# 사전 준비:
+#   1) Secret vsftpd-users 에 user1..user10 / pass1..pass10 추가
+#   2) kubectl apply -f tests/load-test.yaml
+#   3) 별도 셸: kubectl -n ftp exec deploy/vsftpd -c vsftpd -- \
+#        sh -c "ss -tn state established '( sport = :21 )' | wc -l"
+#   4) kubectl top pod -n ftp -l app=vsftpd --containers
+#   5) 종료 후: kubectl delete -f tests/load-test.yaml 및 Secret 원복
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ftp-loadgen
+  namespace: ftp
+spec:
+  parallelism: 50
+  completions: 50
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: ftp-loadgen
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: loadgen
+          image: alpine:3.20
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              apk add --no-cache lftp >/dev/null
+              LB_IP="${LB_IP:?LB_IP env 필요}"
+              SESSIONS_PER_POD="${SESSIONS_PER_POD:-10}"
+              DURATION="${DURATION:-300}"
+
+              # Pod 인덱스(0..parallelism-1)는 hostname 끝의 hash 로 분산 → 사용자 라운드 로빈
+              POD_HASH=$(printf '%s' "$(hostname)" | cksum | awk '{print $1}')
+              echo "loadgen $(hostname) hash=$POD_HASH sessions=$SESSIONS_PER_POD duration=$DURATION"
+
+              # DURATION 동안 살아있도록 cls/!sleep 5 를 반복
+              ITERS=$(( DURATION / 5 + 2 ))
+              SESSION_SCRIPT=$(mktemp)
+              {
+                echo "set ftp:passive-mode true"
+                echo "set net:timeout 10"
+                echo "set net:max-retries 1"
+                echo "set net:reconnect-interval-base 1"
+                i=0
+                while [ $i -lt $ITERS ]; do
+                  echo "cls"
+                  echo "!sleep 5"
+                  i=$((i + 1))
+                done
+                echo "bye"
+              } > "$SESSION_SCRIPT"
+
+              # 본 Pod 안에서 SESSIONS_PER_POD 개 세션 시작 (10 사용자 라운드 로빈)
+              j=1
+              while [ $j -le $SESSIONS_PER_POD ]; do
+                IDX=$(( (POD_HASH + j) % 10 + 1 ))
+                U="user${IDX}"
+                P="pass${IDX}"
+                lftp -u "$U,$P" "$LB_IP" < "$SESSION_SCRIPT" >/dev/null 2>&1 &
+                j=$((j + 1))
+              done
+
+              echo "$(hostname): launched $SESSIONS_PER_POD sessions, holding for $DURATION s"
+              # 자식 lftp 들이 끝날 때까지 대기 (DURATION + 여유)
+              wait
+              echo "$(hostname): done"
+          env:
+            - name: LB_IP
+              value: "192.168.3.42"
+            - name: SESSIONS_PER_POD
+              value: "10"
+            - name: DURATION
+              value: "300"   # 검증 실행 시 120 으로 단축 가능
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
