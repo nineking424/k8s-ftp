@@ -222,6 +222,8 @@ curl --user '<user>:<pw>' "ftp://192.168.3.42/smoke" -o /tmp/smoke.dl && diff /t
 kubectl exec -n ftp deploy/vsftpd -c vsftpd -- tar -czf - -C /srv/ftp . > /tmp/ftp-backup-$(date +%Y%m%d).tar.gz
 ```
 
+`>` 리다이렉트는 로컬 셸에서 동작하므로 파일은 **명령을 실행한 머신의** `/tmp/` 에 생성된다. SSH 세션에서 실행하면 SSH 호스트에 저장되니 주의.
+
 진행률 확인:
 
 ```bash
