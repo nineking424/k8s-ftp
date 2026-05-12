@@ -17,7 +17,7 @@ PASV 포트 100개를 LoadBalancer 로 노출하고, Secret 변경 한 번으로
 |---|---|---|
 | **운영자** | vsftpd Pod 점검, 사용자 추가/제거, 일상 운영 | [→ 사용자 관리](operating/user-management.md) |
 | **On-call** | 사고 발생 시 증상별 대응 매트릭스 진입 | [→ 트러블슈팅](operating/troubleshooting.md) |
-| **컨트리뷰터** | 이미지 / 매니페스트 / vsftpd.conf 수정 | [→ 아키텍처](concepts/architecture.md) |
+| **컨트리뷰터** | 이미지 / 매니페스트 / vsftpd.conf 수정 | [→ 코드 맵](developer/code-map.md) |
 
 ## 핵심 개념 한눈에
 
@@ -43,3 +43,4 @@ flowchart LR
 - 사고가 났다면: [트러블슈팅](operating/troubleshooting.md) 의 증상 매트릭스 진입.
 - 메트릭/로그 식별: [모니터링](operating/monitoring.md).
 - 설치 / 배포 / 운영 SOP: [README](https://github.com/nineking424/k8s-ftp#k8s-배포).
+- FAQ / 디자인 결정 근거: [FAQ](faq.md).
