@@ -8,6 +8,14 @@ on:
       - 'mkdocs.yml'
       - 'requirements-docs.txt'
       - '.github/workflows/docs.yml'
+      - 'README.md'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - '.github/workflows/docs.yml'
+      - 'README.md'
   workflow_dispatch:
 
 permissions:
@@ -41,8 +49,35 @@ jobs:
         with:
           path: site
 
-  deploy:
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-dir
+          path: site/
+
+  link-check:
     needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-dir
+          path: site/
+
+      - name: lychee link check
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --no-progress
+            --remap 'https://nineking424.github.io/k8s-ftp/(.*) file://${{ github.workspace }}/site/$1'
+            --exclude-mail
+            README.md docs/**/*.md
+          fail: true
+
+  deploy:
+    needs: [build, link-check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
