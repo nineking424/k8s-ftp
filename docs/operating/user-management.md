@@ -89,6 +89,8 @@ kubectl get secret vsftpd-users -n ftp -o jsonpath='{.data.users\.txt}' | base64
 sed -i '/^alice$/,+1d' /tmp/users.txt
 ```
 
+> macOS BSD `sed` 은 `-i ''` 가 필요하고 `,+N` 주소 문법 미지원. macOS 라면 `vi /tmp/users.txt` 로 직접 편집 권장.
+
 3. Secret 재생성.
 
 ```bash
