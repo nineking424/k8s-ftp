@@ -80,3 +80,11 @@ kubectl delete -f tests/load-test.yaml
 | 로그 정상 | `kubectl logs -n ftp deploy/vsftpd -c vsftpd --tail=20` | `CONNECT` / `OK LOGIN` 라인만 (`ERROR` 없음) |
 | user-syncer 동기화 완료 | `kubectl logs -n ftp deploy/vsftpd -c user-syncer --tail=5` | `INFO: users.db 동기화 완료` |
 | FTP 로그인 | `curl --ftp-pasv -u <user>:<pw> ftp://<LB_IP>/` | 디렉토리 리스트 출력 |
+
+## 알려진 한계
+
+- **macOS lftp 4.9.3 결함.** `-e` 다중라인 스크립트 + `EHOSTUNREACH`. stdin heredoc 사용. 외부 PASV 검증은 `curl --ftp-pasv` 우회.
+- **k8s 테스트는 실제 클러스터 필요.** 부하 / 무중단 테스트는 kind / minikube 에서 재현 안 됨 (NAS RWX + MetalLB 의존).
+- **부하 테스트 cleanup 자동화 없음.** loadgen Job 종료 후 수동 `kubectl delete -f`.
+- **사용자 자격증명 셸 history 노출.** `zero-downtime-useradd.sh` 가 비밀번호를 인자로 받음. 검증 후 history 정리 권장.
+- **자동 회귀 (CI) 미통합.** 1.0 범위에서 테스트는 로컬 / k8s 수동 실행. CI 자동화는 NAS RWX 클러스터 접근 정책 확정 후.
