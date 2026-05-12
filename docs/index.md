@@ -15,7 +15,7 @@ PASV 포트 100개를 LoadBalancer 로 노출하고, Secret 변경 한 번으로
 
 | 역할 | 설명 | 시작 페이지 |
 |---|---|---|
-| **운영자** | vsftpd Pod 점검, 사용자 추가/제거, 일상 운영 | [→ 운영 개요](operating/index.md) |
+| **운영자** | vsftpd Pod 점검, 사용자 추가/제거, 일상 운영 | [→ 사용자 관리](operating/user-management.md) |
 | **On-call** | 사고 발생 시 증상별 대응 매트릭스 진입 | [→ 트러블슈팅](operating/troubleshooting.md) |
 | **컨트리뷰터** | 이미지 / 매니페스트 / vsftpd.conf 수정 | [→ 아키텍처](concepts/architecture.md) |
 

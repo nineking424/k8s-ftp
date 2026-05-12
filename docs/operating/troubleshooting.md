@@ -46,7 +46,7 @@ kubectl logs -n ftp -l app=vsftpd -c user-syncer --tail=20 | grep -E "ERROR|INFO
 
 `INFO: users.db 동기화 완료` 가 Secret apply 이후 timestamp 면 동기화 성공 — 다른 원인. `ERROR: 잘못된 사용자명` 또는 `ERROR: ... 줄 수가 짝수가 아님` 이 보이면 검증 실패다.
 
-**조치.** Secret 의 `users.txt` 를 다시 받아서 형식 확인 — 사용자명 라인과 패스워드 라인이 짝을 이루는지, 사용자명에 허용 문자만 들어 있는지. 수정 후 `kubectl apply -f secret.yaml`. 깊은 절차는 [README — 사용자 추가](https://github.com/nineking424/k8s-ftp#사용자-추가).
+**조치.** Secret 의 `users.txt` 를 다시 받아서 형식 확인 — 사용자명 라인과 패스워드 라인이 짝을 이루는지, 사용자명에 허용 문자만 들어 있는지. 수정 후 `kubectl apply -f secret.yaml`. 깊은 절차는 [user-management.md — 사용자 추가](user-management.md#사용자-추가).
 
 **확인.** user-syncer 로그에 `INFO: users.db 동기화 완료` 가 새 timestamp 로 찍히고, `curl --user '<newuser>:<pw>' ftp://<LB IP>/` 가 `230 Login successful`.
 
