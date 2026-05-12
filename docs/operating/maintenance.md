@@ -203,3 +203,50 @@ curl --user '<user>:<pw>' "ftp://192.168.3.42/smoke" -o /tmp/smoke.dl && diff /t
 
 - **롤아웃 짧은 끊김.** 위 PASV 확장과 동일 ~10 초. RollingUpdate.maxUnavailable=1 + replicas=1 이라 사실상 전면 끊김 윈도우. 진정한 무중단이 필요하면 replicas=2 + leader-elect 메커니즘 도입 검토 (현재 1.0 범위 밖).
 - **롤백 절차 별도** — 본 페이지에 포함하지 않는다. `kubectl rollout undo deployment/vsftpd -n ftp` 가 일반적이지만 user-syncer 의 sidecar 동작이 이전 버전과 호환되는지 변경 관리 절차에서 사전 검증.
+
+## 백업과 복구
+
+세 종류의 상태를 별도로 관리. 동일 메커니즘이 아니므로 각각 정책.
+
+| 대상 | source of truth | 백업 정책 | 복구 |
+|---|---|---|---|
+| 사용자 데이터 (`/srv/ftp/`) | NAS PVC | NAS 측 스냅샷 — 사내 NAS 운영팀 RPO/RTO 합의 | NAS 스냅샷 복구 후 PVC 재마운트 |
+| 사용자 자격증명 (`vsftpd-users` Secret) | etcd | etcd 백업으로 보호 + 평문 `users.txt` 는 별도 password manager (GitOps 평문 저장 금지) | etcd 복원 또는 password manager 에서 재구성 |
+| 매니페스트 (`k8s/`, `docker/`) | 본 저장소 | Git 자체가 보관 — 외부 미러 1 개 권장 | `git clone` + `kubectl apply -k .` |
+
+**사전 조건.** NAS 운영팀과 사전 합의된 RPO/RTO 가 있어야 의미 있다. 본 페이지는 *기술적 절차* 만 — 정책은 운영 합의 사항.
+
+**단계 — 임시 데이터 백업 (NAS 스냅샷 외, 마이그레이션·검증용).**
+
+```bash
+kubectl exec -n ftp deploy/vsftpd -c vsftpd -- tar -czf - -C /srv/ftp . > /tmp/ftp-backup-$(date +%Y%m%d).tar.gz
+```
+
+진행률 확인:
+
+```bash
+ls -lh /tmp/ftp-backup-*.tar.gz
+```
+
+**단계 — Secret 백업 (디버깅·이관용).**
+
+```bash
+kubectl get secret vsftpd-users -n ftp -o yaml > /tmp/secret-backup-$(date +%Y%m%d).yaml
+chmod 600 /tmp/secret-backup-*.yaml
+```
+
+*평문 base64 가 들어 있으므로 보관 위치 통제 필수.* 작업 후 즉시 삭제 또는 password manager 에.
+
+**검증.**
+
+```bash
+tar -tzf /tmp/ftp-backup-$(date +%Y%m%d).tar.gz | head -5
+```
+
+파일 목록이 비어 있지 않으면 백업 본문 정상.
+
+**알려진 한계.**
+
+- **NAS 스냅샷이 정본 백업.** 본 페이지의 `tar` 백업은 *마이그레이션·임시 검증용* 이지 정기 백업 정책의 대체가 아니다. 정기 백업은 NAS 운영팀 정책에 위임.
+- **Secret 평문 노출.** `kubectl get secret -o yaml` 산출물엔 base64 만 들어가지만 `base64 -d` 한 줄로 평문이 되므로 보안 등급은 평문과 동일. 안전한 보관 채널 외 저장 금지.
+- **PIT (point-in-time) 복원 불가.** NAS 스냅샷의 보존 간격이 RPO 의 하한. 분 단위 복원이 필요하면 별도 스토리지 검토 (현재 1.0 범위 밖).
