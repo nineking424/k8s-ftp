@@ -40,5 +40,6 @@ nav:
       - 아키텍처: concepts/architecture.md
   - 운영:
       - 개요: operating/index.md
+      - 사용자 관리: operating/user-management.md
       - 모니터링: operating/monitoring.md
       - 트러블슈팅: operating/troubleshooting.md
