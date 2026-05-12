@@ -75,3 +75,131 @@ curl -v --disable-epsv --ftp-pasv --user '<user>:<pw>' "ftp://192.168.3.42/" 2>&
 
 - **Service 포트 enumerate** — k8s 가 포트 range 표기를 지원하지 않아 100 단위로 늘릴 때마다 manifest 가 길어진다. 200 포트 이상은 generate-only 헬퍼 스크립트 도입 검토.
 - **롤아웃 중 짧은 무중단 끊김** — vsftpd Pod 가 재시작되는 ~10 초 동안 신규 세션 연결 실패 가능. 기존 세션은 RollingUpdate 의 maxUnavailable 설정에 따라 영향.
+
+## LB IP 변경
+
+MetalLB 풀의 외부 IP 가 변경되거나 새 LB 로 마이그레이션할 때. control 채널만 잡히고 PASV 데이터 채널이 끊기는 가장 흔한 원인이 PASV_ADDRESS 와 실제 LB IP 불일치이므로 두 값을 항상 동시에 변경.
+
+**사전 조건.**
+
+- 신규 IP 가 MetalLB AddressPool 안에 있고 다른 Service 가 점유 중이 아님.
+- 클라이언트 측 방화벽 규칙이 신규 IP 의 21 + 30000-30099 (또는 확장 범위) 를 허용함을 사전 합의.
+
+**단계.**
+
+기존 `192.168.3.42` → 신규 `192.168.3.43` 예시.
+
+1. `ConfigMap vsftpd-config` 의 `PASV_ADDRESS` 값을 신규 IP 로.
+
+```bash
+kubectl get configmap vsftpd-config -n ftp -o yaml > /tmp/cm.yaml
+sed -i 's/PASV_ADDRESS: "192.168.3.42"/PASV_ADDRESS: "192.168.3.43"/' /tmp/cm.yaml
+kubectl apply -f /tmp/cm.yaml && rm /tmp/cm.yaml
+```
+
+2. Service 의 `metallb.io/loadBalancerIPs` annotation 도 동일 IP 로.
+
+```bash
+kubectl annotate svc vsftpd -n ftp metallb.io/loadBalancerIPs=192.168.3.43 --overwrite
+```
+
+3. ConfigMap 변경은 vsftpd 가 재기동해야 반영되므로 롤아웃.
+
+```bash
+kubectl rollout restart deployment/vsftpd -n ftp
+kubectl rollout status deployment/vsftpd -n ftp --timeout=120s
+```
+
+4. Service 의 EXTERNAL-IP 가 신규 IP 로 갱신됐는지 확인.
+
+```bash
+kubectl get svc vsftpd -n ftp -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+```
+
+기대값: `192.168.3.43`.
+
+5. 클라이언트 공지 — 사내 채널에 신규 IP 와 변경 시각 공지.
+
+**검증.**
+
+```bash
+curl --disable-epsv --ftp-pasv --user '<user>:<pw>' "ftp://192.168.3.43/" 2>&1 | grep -E "Connected|227 Entering Passive Mode"
+```
+
+`Connected` + `227` 튜플의 앞 네 수가 `192,168,3,43` 이면 통과.
+
+**알려진 한계.**
+
+- **기존 클라이언트 측 DNS/hosts 캐시.** 도메인 기반이 아니라 IP 직접 사용이라면 클라이언트 캐시는 없지만, 사내 DNS 에 별칭이 있다면 TTL 만료 대기 필요.
+- **변경 윈도우 동안 신규 세션 끊김.** 롤아웃 ~10 초 + Service EXTERNAL-IP 재할당 ~5 초 — 신규 세션 실패 윈도우 합쳐 15-30 초.
+
+## 이미지 보안 패치
+
+분기별 또는 CVE 공지 후 베이스 이미지 (Debian slim) 와 vsftpd 패키지 업데이트. 단순 `kubectl rollout restart` 가 아니라 이미지 재빌드가 선행.
+
+**사전 조건.**
+
+- 현재 운영 중 이미지 태그 확인 — `kubectl get deploy vsftpd -n ftp -o jsonpath='{.spec.template.spec.containers[*].image}'`.
+- Container registry 푸시 권한.
+- 롤아웃 전 신규 이미지로 로컬 smoke 테스트 (`docker run` + `curl --user test:test ftp://localhost/`) 권장.
+
+**단계.**
+
+1. `docker/Dockerfile` 의 베이스 이미지 정책 확인.
+
+```bash
+grep "^FROM " docker/Dockerfile
+```
+
+- 단순 태그 사용 (예: `debian:bookworm-slim`) — `--no-cache` 빌드만으로 apt 가 최신 패키지 인덱스를 받아 패치 흡수. Dockerfile 변경 불필요.
+- 다이제스트 고정 사용 (`debian:bookworm-slim@sha256:...`) — `docker pull debian:bookworm-slim && docker inspect ... --format '{{index .RepoDigests 0}}'` 로 새 다이제스트를 얻어 `FROM` 라인 교체.
+
+2. 이미지 재빌드 — 캐시 무시로 apt 패치를 확실히 흡수.
+
+```bash
+docker build --no-cache -t <registry>/vsftpd:v$(date +%Y%m%d)-1 docker/
+```
+
+3. 로컬 smoke 테스트 (선택).
+
+```bash
+docker run --rm -d --name vsftpd-smoke -p 2121:21 <registry>/vsftpd:v$(date +%Y%m%d)-1
+sleep 5
+curl -v ftp://localhost:2121/ 2>&1 | grep "220"
+docker stop vsftpd-smoke
+```
+
+4. 푸시.
+
+```bash
+docker push <registry>/vsftpd:v$(date +%Y%m%d)-1
+```
+
+5. Deployment 의 두 컨테이너 (vsftpd + user-syncer) 이미지 태그 동시 갱신.
+
+```bash
+kubectl set image deployment/vsftpd -n ftp \
+  vsftpd=<registry>/vsftpd:v$(date +%Y%m%d)-1 \
+  user-syncer=<registry>/vsftpd:v$(date +%Y%m%d)-1
+kubectl rollout status deployment/vsftpd -n ftp --timeout=120s
+```
+
+**검증.**
+
+- Pod 가 새 태그로 떠 있음.
+
+```bash
+kubectl get pod -n ftp -l app=vsftpd -o jsonpath='{.items[*].spec.containers[*].image}'
+```
+
+- 로그인 + 업로드 round-trip.
+
+```bash
+echo test > /tmp/smoke && curl --user '<user>:<pw>' -T /tmp/smoke "ftp://192.168.3.42/"
+curl --user '<user>:<pw>' "ftp://192.168.3.42/smoke" -o /tmp/smoke.dl && diff /tmp/smoke /tmp/smoke.dl
+```
+
+**알려진 한계.**
+
+- **롤아웃 짧은 끊김.** 위 PASV 확장과 동일 ~10 초. RollingUpdate.maxUnavailable=1 + replicas=1 이라 사실상 전면 끊김 윈도우. 진정한 무중단이 필요하면 replicas=2 + leader-elect 메커니즘 도입 검토 (현재 1.0 범위 밖).
+- **롤백 절차 별도** — 본 페이지에 포함하지 않는다. `kubectl rollout undo deployment/vsftpd -n ftp` 가 일반적이지만 user-syncer 의 sidecar 동작이 이전 버전과 호환되는지 변경 관리 절차에서 사전 검증.
