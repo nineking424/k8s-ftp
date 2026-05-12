@@ -44,3 +44,4 @@ flowchart LR
 - 메트릭/로그 식별: [모니터링](operating/monitoring.md).
 - 설치 / 배포 / 운영 SOP: [README](https://github.com/nineking424/k8s-ftp#k8s-배포).
 - FAQ / 디자인 결정 근거: [FAQ](faq.md).
+- 용어 빠른 조회: [용어집](glossary.md).
