@@ -38,17 +38,71 @@ flowchart LR
 - **호출**: vsftpd 가 PAM `pam_userdb.so db=/shared/users` 로 인증 (Berkeley DB).
 - **결과**: 성공 시 chroot 후 `/srv/ftp/<user>` 로 진입. `230 Login successful` 응답.
 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant LB as LoadBalancer
+    participant V as vsftpd
+    participant PAM as pam_pwdfile
+    participant DB as users.db
+    C->>LB: USER alice (TCP 21)
+    LB->>V: USER alice
+    C->>LB: PASS xxx
+    LB->>V: PASS xxx
+    V->>PAM: authenticate(alice, xxx)
+    PAM->>DB: open + lookup alice
+    DB-->>PAM: hash match
+    PAM-->>V: success
+    V->>V: chroot /srv/ftp/alice
+    V-->>C: 230 Login successful
+```
+
 ### 2. PASV 채널 열림 (data 채널)
 
 - **신호**: 클라이언트 `PASV` 명령.
 - **호출**: vsftpd 가 30000–30099 사이에서 빈 포트를 할당, 클라이언트에 `227 Entering Passive Mode (192,168,3,42,…)` 응답.
 - **결과**: 클라이언트가 같은 LB IP 의 그 포트로 직접 연결. `externalTrafficPolicy: Local` 이라 같은 노드의 vsftpd Pod 로 라우팅된다.
 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant LB as LoadBalancer
+    participant V as vsftpd Pod
+    Note over C,V: control 세션 이미 수립됨
+    C->>LB: PASV (TCP 21)
+    LB->>V: PASV
+    V->>V: 30000-30099 중 한 포트 P 할당
+    V-->>LB: 227 Entering Passive Mode (LB IP, P)
+    LB-->>C: 227 ... (LB IP 그대로 전달)
+    C->>LB: TCP connect (LB IP : P)
+    LB->>V: data 채널 연결
+    Note over C,V: data 채널 수립 — 파일 전송
+```
+
 ### 3. 무중단 사용자 추가
 
 - **신호**: `kubectl apply -f secret.yaml` 로 `vsftpd-users` 갱신.
 - **호출**: kubelet 이 projected volume 의 `users.txt` 를 atomic 갱신 (`..data/` 심볼릭 링크 회전). user-syncer 의 inotify 가 `moved_to` 이벤트 감지 후 `sleep 1` 로 마운트 안정화 대기.
 - **결과**: 줄 수 짝수성 / 사용자명 정규식 (`[a-zA-Z0-9_-]+`) 검증 통과 시 `users.db.new` 빌드 → `mv` 로 swap. vsftpd 는 매 로그인마다 DB 를 다시 열기 때문에 재기동 없이 신규 사용자 즉시 로그인 (관측 ~18초).
+
+```mermaid
+sequenceDiagram
+    participant Op as 운영자
+    participant K as kubectl
+    participant S as Secret (Pod mount)
+    participant US as user-syncer
+    participant FS as /etc/vsftpd_user_passwd
+    participant V as vsftpd
+    Op->>K: kubectl apply Secret
+    K->>S: users.txt 갱신
+    S->>US: inotify 감지
+    US->>US: 검증 (줄수 짝수 / 정규식)
+    US->>US: db_load → /tmp/users.db.new
+    US->>FS: mv (atomic rename)
+    US->>US: mkdir /srv/ftp/<new_user>/
+    Note over US,V: 약 18 초 누적 — vsftpd 는 매 로그인마다 DB 재오픈
+    Op-->>V: 신규 사용자 charlie 로그인 가능
+```
 
 ### 4. 사용자 디렉토리 자동 생성
 
