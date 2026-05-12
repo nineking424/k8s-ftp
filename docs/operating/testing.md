@@ -18,3 +18,65 @@
 |---|---|---|
 | 로컬 | `docker` (또는 `podman`), `lftp` | macOS lftp 4.9.3 에서 `EHOSTUNREACH` 알려진 결함 — 외부 PASV 검증은 `curl --ftp-pasv` 우회 |
 | k8s | `kubectl` (정상 `KUBECONFIG`), 배포된 vsftpd Pod | `zero-downtime-useradd.sh` 는 LB IP + alice 자격증명 필요 |
+
+## 실행 절차
+
+### local-smoke.sh
+
+```bash
+./tests/local-smoke.sh
+```
+
+Expected: 마지막 줄에 `OK`. 컨테이너 이름 `k8s-ftp-smoke` 으로 임시 run / cleanup.
+
+### multi-user.sh
+
+```bash
+./tests/multi-user.sh
+```
+
+Expected: 10 사용자 각각 자기 디렉토리 + 자기 파일 1 개만 — 격리 검증.
+
+### chroot-escape.sh
+
+```bash
+./tests/chroot-escape.sh
+```
+
+Expected: alice 가 bob 디렉토리 / 파일에 도달 못함 (`550 Failed to ...` 등). 실패 = chroot 깨진 것이므로 즉시 [troubleshooting.md](troubleshooting.md) 진입.
+
+### zero-downtime-useradd.sh
+
+```bash
+./tests/zero-downtime-useradd.sh <LB_IP> <alice_pw>
+```
+
+Expected: alice 200 MB 업로드 진행 중 charlie 가 ~18 초 내 로그인. Pod `restartCount` 변화 없음.
+
+> 비밀번호가 셸 history 에 남는다. 검증 후 `history -d <line>` 또는 셸 종료.
+
+### load-test.yaml
+
+```bash
+kubectl apply -f tests/load-test.yaml
+kubectl -n ftp-loadgen wait --for=condition=complete --timeout=10m job/ftp-loadgen
+```
+
+부하 종료 후 정리:
+
+```bash
+kubectl delete -f tests/load-test.yaml
+```
+
+상세 부하 모델은 capacity.md — 부하 테스트 결과.
+
+## 배포 검증
+
+변경 푸시 후 매번 실행:
+
+| 항목 | 명령 | 통과 기준 |
+|---|---|---|
+| 컨테이너 살아 있음 | `kubectl get pod -n ftp -l app=vsftpd` | `Running` + `2/2 Ready` |
+| 로그 정상 | `kubectl logs -n ftp deploy/vsftpd -c vsftpd --tail=20` | `CONNECT` / `OK LOGIN` 라인만 (`ERROR` 없음) |
+| user-syncer 동기화 완료 | `kubectl logs -n ftp deploy/vsftpd -c user-syncer --tail=5` | `INFO: users.db 동기화 완료` |
+| FTP 로그인 | `curl --ftp-pasv -u <user>:<pw> ftp://<LB_IP>/` | 디렉토리 리스트 출력 |
