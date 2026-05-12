@@ -42,5 +42,10 @@ nav:
       - 개요: operating/index.md
       - 사용자 관리: operating/user-management.md
       - 운영 절차: operating/maintenance.md
+      - 테스트와 검증: operating/testing.md
       - 모니터링: operating/monitoring.md
       - 트러블슈팅: operating/troubleshooting.md
+  - 개발자:
+      - 개요: developer/index.md
+      - 코드 맵: developer/code-map.md
+  - FAQ: faq.md
