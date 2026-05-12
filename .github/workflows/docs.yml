@@ -72,6 +72,7 @@ jobs:
             --no-progress
             --remap 'https://nineking424.github.io/k8s-ftp/(.*) file://${{ github.workspace }}/site/$1'
             --exclude-mail
+            --exclude-path 'docs/superpowers'
             README.md docs/**/*.md
           fail: true
 
