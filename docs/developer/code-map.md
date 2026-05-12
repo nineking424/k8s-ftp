@@ -68,3 +68,24 @@
 6. 신규 사용자별 `mkdir -p /srv/ftp/<user>/` + owner/perms 일관.
 
 vsftpd 는 매 로그인마다 DB 를 다시 열기 때문에 재기동 불필요. 반영 지연은 inotify → db_load → mv 합계 약 18 초 (관측치).
+
+## 공통 변경 흐름
+
+**`docker/` 변경 시.**
+
+1. 로컬 변경 후 `tests/local-smoke.sh` 통과 확인.
+2. `docker build --no-cache -t <registry>/vsftpd-k8s:<tag> docker/` + `docker push`.
+3. `kubectl set image deployment/vsftpd -n ftp vsftpd=<new-tag> user-syncer=<new-tag>` (두 컨테이너 동시 — 같은 이미지).
+4. operating/testing.md — 배포 검증 의 스모크 실행.
+
+**`k8s/` 변경 시.**
+
+- 매니페스트만 변경 → 개별 `kubectl apply -f k8s/<file>.yaml`.
+- 포트 범위 / LB IP 등 큰 변화는 [operating/maintenance.md](../operating/maintenance.md) 의 절차 참고 — Service + ConfigMap + Deployment 의 변경 순서가 중요.
+
+## 알려진 한계 (의도적으로 안 한 것)
+
+- **process supervisor 미사용.** entrypoint 의 백그라운드 + foreground 패턴이 단순해서 supervisord / s6 도입 안 함. 다음 프로세스 추가 시 재검토.
+- **multi-stage build 미사용.** 이미지 크기보다 디버깅 용이성 우선. apt 패키지 그대로.
+- **vsftpd 빌드 안 함.** Debian 패키지 vsftpd 3.0.5 를 그대로 사용. 패치 필요 시점에서 fork 결정.
+- **PAM 모듈 자체 변경 불가.** `libpam-pwdfile` 의존. 다른 인증 백엔드 (LDAP / OIDC) 는 별도 PAM 모듈 + 큰 재설계 필요.
