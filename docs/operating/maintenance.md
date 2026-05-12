@@ -23,6 +23,8 @@
 sed -i 's/^pasv_max_port=.*/pasv_max_port=30199/' docker/conf/vsftpd.conf
 ```
 
+> macOS BSD `sed` 은 `-i ''` 가 필요. 이 페이지의 모든 `sed -i` 명령에 동일.
+
 2. 이미지 재빌드 + 푸시 — 태그는 날짜 기반 (`vYYYYMMDD-1`).
 
 ```bash
