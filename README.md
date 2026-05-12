@@ -24,14 +24,14 @@ kubectl apply -f k8s/
 ## 운영 SOP
 
 ### 사용자 추가
-1. `kubectl get secret -n ftp vsftpd-users -o yaml > /tmp/secret.yaml`
-2. `/tmp/secret.yaml`의 `stringData.users.txt`에 사용자명+패스워드 두 줄 추가
-3. `kubectl apply -f /tmp/secret.yaml && rm /tmp/secret.yaml`
-4. 약 60-90초 후 신규 사용자 로그인 검증 (관측 사례 ~18초)
+한 줄 요약: `kubectl create secret generic vsftpd-users --from-file=users.txt=/tmp/users.txt -n ftp --dry-run=client -o yaml | kubectl apply -f -`
+
+자세한 절차: [user-management.md — 사용자 추가](https://nineking424.github.io/k8s-ftp/operating/user-management/#사용자-추가)
 
 ### 사용자 제거
-1. 동일 절차로 Secret에서 해당 사용자 두 줄 제거
-2. 데이터 정리는 별도 절차 (사용자 디렉토리 `/srv/ftp/<user>/` 백업 후 삭제)
+동일 메커니즘으로 Secret 에서 두 줄 (사용자명+비밀번호) 제거. 데이터 디렉토리 `/srv/ftp/<user>/` 는 별도 백업 후 정리.
+
+자세한 절차: [user-management.md — 사용자 제거](https://nineking424.github.io/k8s-ftp/operating/user-management/#사용자-제거)
 
 ### PASV 포트 사용률 확인
 ```bash
