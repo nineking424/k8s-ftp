@@ -35,7 +35,7 @@ flowchart LR
     Vsftpd -->|read/write| NAS[(NAS PVC ftp-data RWX)]
 ```
 
-상세 흐름은 [개념 — 아키텍처](concepts/architecture.md), 일상 운영 SOP 는 [README#운영-sop](https://github.com/nineking424/k8s-ftp#운영-sop) 참고.
+상세 흐름은 [개념 — 아키텍처](concepts/architecture.md), 일상 운영 절차는 [운영](operating/index.md) 섹션의 페이지들이 정본.
 
 ## 다음 단계
 

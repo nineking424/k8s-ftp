@@ -21,44 +21,16 @@ kubectl apply -f k8s/00-namespace.yaml
 kubectl apply -f k8s/
 ```
 
-## 운영 SOP
+## 운영 빠른 참조
 
-### 사용자 추가
-한 줄 요약: `kubectl create secret generic vsftpd-users --from-file=users.txt=/tmp/users.txt -n ftp --dry-run=client -o yaml | kubectl apply -f -`
+자세한 절차는 wiki 가 정본이다. 본 표는 자주 쓰는 명령의 요약.
 
-자세한 절차: [user-management.md — 사용자 추가](https://nineking424.github.io/k8s-ftp/operating/user-management/#사용자-추가)
-
-### 사용자 제거
-동일 메커니즘으로 Secret 에서 두 줄 (사용자명+비밀번호) 제거. 데이터 디렉토리 `/srv/ftp/<user>/` 는 별도 백업 후 정리.
-
-자세한 절차: [user-management.md — 사용자 제거](https://nineking424.github.io/k8s-ftp/operating/user-management/#사용자-제거)
-
-### PASV 포트 사용률 확인
-```bash
-kubectl exec -n ftp deploy/vsftpd -c vsftpd -- sh -c "ss -tn '( sport >= :30000 and sport <= :30099 )' | wc -l"
-```
-사용률 80개 이상 지속 시 PASV 포트 범위 확장 작업 필요.
-
-> 컨테이너 PID/namespace 제약으로 위 명령이 0을 반환할 수 있음. 그 경우 vsftpd 자식 PID 수로 대체: `kubectl exec -n ftp deploy/vsftpd -c vsftpd -- sh -c 'ls /proc | grep -c "^[0-9]"'`
-
-### PASV 포트 범위 확장
-1. `docker/conf/vsftpd.conf`의 `pasv_max_port` 값 변경
-2. 이미지 재빌드 + 푸시
-3. `k8s/05-service.yaml`에 신규 포트 항목 추가
-4. `kubectl apply -f k8s/05-service.yaml -f k8s/04-deployment.yaml`
-
-### LB IP 변경
-1. ConfigMap `vsftpd-config`의 `PASV_ADDRESS` 값 변경
-2. Service `k8s/05-service.yaml`의 `metallb.io/loadBalancerIPs` annotation 변경
-3. `kubectl rollout restart deployment/vsftpd -n ftp`
-4. 클라이언트 공지
-
-### 보안 패치 (분기별)
-1. Debian slim 베이스 이미지 최신 태그로 `docker/Dockerfile` 갱신
-2. `docker build` + 푸시
-3. `kubectl set image deployment/vsftpd -n ftp vsftpd=<new-tag> user-syncer=<new-tag>`
-
-### 백업
-- 데이터: NAS 스냅샷 정책에 위임 (사내 NAS 운영팀 RPO/RTO 합의)
-- Secret: etcd 백업으로 보호. 평문 사용자 목록은 GitOps에 평문 저장 금지.
-- 매니페스트: 본 저장소가 source of truth.
+| 작업 | 한 줄 명령 (요약) | 자세한 절차 |
+|---|---|---|
+| 사용자 추가/제거 | `kubectl create secret generic vsftpd-users --from-file=users.txt=/tmp/users.txt -n ftp --dry-run=client -o yaml \| kubectl apply -f -` | [user-management.md](https://nineking424.github.io/k8s-ftp/operating/user-management/) |
+| 활성 세션 확인 | `kubectl exec -n ftp deploy/vsftpd -c vsftpd -- sh -c 'ls /proc \| grep -c "^[0-9]"'` | [monitoring.md — 동시 세션과 PASV 사용률](https://nineking424.github.io/k8s-ftp/operating/monitoring/#동시-세션과-pasv-사용률) |
+| PASV 포트 범위 확장 | (manifests 변경 필요) | [maintenance.md — PASV 포트 범위 확장](https://nineking424.github.io/k8s-ftp/operating/maintenance/#pasv-포트-범위-확장) |
+| LB IP 변경 | (annotation + ConfigMap 변경) | [maintenance.md — LB IP 변경](https://nineking424.github.io/k8s-ftp/operating/maintenance/#lb-ip-변경) |
+| 이미지 보안 패치 | `docker build --no-cache && docker push && kubectl set image deployment/vsftpd ...` | [maintenance.md — 이미지 보안 패치](https://nineking424.github.io/k8s-ftp/operating/maintenance/#이미지-보안-패치) |
+| 백업 | `kubectl exec -n ftp deploy/vsftpd -c vsftpd -- tar -czf - -C /srv/ftp .` (NAS 스냅샷이 정본) | [maintenance.md — 백업과 복구](https://nineking424.github.io/k8s-ftp/operating/maintenance/#백업과-복구) |
+| 트러블슈팅 | — | [troubleshooting.md](https://nineking424.github.io/k8s-ftp/operating/troubleshooting/) |

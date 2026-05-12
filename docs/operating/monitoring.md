@@ -46,23 +46,25 @@ kubectl exec -n ftp deploy/vsftpd -c vsftpd -- sh -c 'ls /proc | grep -c "^[0-9]
 
 ### 메트릭 카탈로그 (placeholder)
 
-| 메트릭 | 모드 | 현재 산출 | 라벨 (예상 카디널리티) |
-|---|---|---|---|
-| `<vsftpd_sessions_active>` | (미도입) | 자식 PID 카운트 (위 절) | exporter 도입 시 `user` (10–수십) |
-| `<vsftpd_login_failed_total>` | (미도입) | `kubectl logs ... \| grep "FAIL LOGIN" \| wc -l` | exporter 도입 시 `source_ip` (카디널리티 폭주 위험 — 필터 필요) |
-| `<vsftpd_max_per_ip_rejects_total>` | (미도입) | `kubectl logs ... \| grep "421 Too many" \| wc -l` | exporter 도입 시 `source_ip` |
-| `<pod_restart_count>` | scrape (kube-state-metrics) | `kubectl get pod -n ftp -l app=vsftpd -o jsonpath='{.items[0].status.containerStatuses[*].restartCount}'` | `container` (2: vsftpd, user-syncer) |
+표의 `< >` 로 둘러싸인 식별자는 *미정 자리* — exporter 도입이나 사내 자료 확정 후 채운다.
+
+| 메트릭 | 모드 | 현재 산출 | 라벨 (예상 카디널리티) | 이름 확정 조건 |
+|---|---|---|---|---|
+| `<vsftpd_sessions_active>` | (미도입) | 자식 PID 카운트 (위 절) | exporter 도입 시 `user` (10–수십) | vsftpd exporter 도입 결정 (1.0 운영 안정화 후) |
+| `<vsftpd_login_failed_total>` | (미도입) | `kubectl logs ... \| grep "FAIL LOGIN" \| wc -l` | exporter 도입 시 `source_ip` (카디널리티 폭주 위험 — 필터 필요) | 동상 |
+| `<vsftpd_max_per_ip_rejects_total>` | (미도입) | `kubectl logs ... \| grep "421 Too many" \| wc -l` | exporter 도입 시 `source_ip` | 동상 |
+| `<pod_restart_count>` | scrape (kube-state-metrics) | `kubectl get pod -n ftp -l app=vsftpd -o jsonpath='{.items[0].status.containerStatuses[*].restartCount}'` | `container` (2: vsftpd, user-syncer) | 결정됨 — kube-state-metrics 기본 메트릭 |
 
 ### 권장 알람 (임계값 placeholder)
 
-| 신호 | 임계값 | 의미 |
-|---|---|---|
-| 자식 PID 카운트 (활성 세션) | ≥ 480 | `max_clients=600` 의 80% — 수용량 검토 |
-| `FAIL LOGIN` 5분 내 N회 같은 source IP | `<N from security policy>` | brute force 의심 → IP 차단 절차 |
-| `421 Too many connections` 분당 발생 | `<rate from SLO>` | `max_per_ip` 임계 도달 — 정책 재검토 |
-| Pod `restartCount` 증가 | 모니터링 인터벌 내 1회 이상 | vsftpd master crash → [트러블슈팅 — Pod CrashLoop](troubleshooting.md#pod-가-crashloop) |
+| 신호 | 임계값 | 의미 | 임계 결정 조건 |
+|---|---|---|---|
+| 자식 PID 카운트 (활성 세션) | ≥ 480 | `max_clients=600` 의 80% — 수용량 검토 | 결정됨 — `vsftpd.conf` 의 `max_clients` 변경 시 재계산 |
+| `FAIL LOGIN` 5분 내 N회 같은 source IP | `<N from security policy>` | brute force 의심 → IP 차단 절차 | 사내 보안 정책 확정 후 채움. **임시 운영: 분당 ≥ 5 시 수동 검토** |
+| `421 Too many connections` 분당 발생 | `<rate from SLO>` | `max_per_ip` 임계 도달 — 정책 재검토 | 가용성 SLO 확정 후 채움. **임시 운영: 분당 ≥ 3 시 수동 검토** |
+| Pod `restartCount` 증가 | 모니터링 인터벌 내 1회 이상 | vsftpd master crash → [트러블슈팅 — Pod CrashLoop](troubleshooting.md#pod-가-crashloop) | 결정됨 — kube-state-metrics 의 변화량 감지 |
 
-`<N from security policy>` 와 `<rate from SLO>` 는 사내 보안/SLO 문서가 확정되면 채워야 하는 자리. 그 숫자를 임의로 적지 않는다.
+`<N from security policy>` 와 `<rate from SLO>` 의 임시 운영 임계 (분당 ≥ 5 / 분당 ≥ 3) 는 *근거 없는 가이드라인* 으로, 실제 정책 확정 시 즉시 교체한다. 그동안 on-call 이 "지금 뭘 해야 하나" 의 답을 받지 못하는 공백을 메우기 위함이지 SLO 가 아니다.
 
 ## 알려진 한계
 

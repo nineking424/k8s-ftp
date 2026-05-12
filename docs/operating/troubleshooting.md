@@ -1,6 +1,6 @@
 # 트러블슈팅
 
-증상 → 원인 → 진단 → 조치 → 확인 매트릭스. 깊은 절차는 [README#운영-sop](https://github.com/nineking424/k8s-ftp#운영-sop) 로 점프한다.
+증상 → 원인 → 진단 → 조치 → 확인 매트릭스. 깊은 절차는 [운영 절차](maintenance.md) 와 [사용자 관리](user-management.md) 가 정본이다.
 
 ## PASV 가 닿지 않는다 (업로드/다운로드 시작 안됨)
 
